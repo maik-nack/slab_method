@@ -1,2 +1,2 @@
-# slab_decomposition
-Slab decomposition method for point localization in PSLG
+# slab_method
+Slab method for point location in planar straight-line graph (PSLG)
