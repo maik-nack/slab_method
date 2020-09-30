@@ -7,6 +7,9 @@ class Edge:
         self.p1 = p1
         self.p2 = p2
 
+    def __repr__(self):
+        return f'<Edge v=({self.v1}, {self.v2}) f=({self.f1}, {self.f2}) p=({self.p1}, {self.p2})>'
+
     def rotate180(self):
         self.v1, self.v2 = self.v2, self.v1
         self.f1, self.f2 = self.f2, self.f1
