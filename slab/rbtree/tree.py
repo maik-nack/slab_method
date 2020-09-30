@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 from .node import Color, RBNode
 from dcel import Edge
@@ -7,11 +7,16 @@ from dcel import Edge
 class RBTree:
     null: RBNode
     roots: List[RBNode]
+    edge_compare: Callable[[Edge, Edge], bool]
 
-    def __init__(self):
+    def __init__(self, edge_compare: Callable[[Edge, Edge], bool]):
+        """
+        :param edge_compare: function for comparison of two edges that returns True if first edge is `less` than second
+        """
         self.null = RBNode(0, Color.black, None, None)
         self.roots = [self.null]
         self.version = 0
+        self.edge_compare = edge_compare
 
     def get_root(self, version: int = None) -> RBNode:
         return self.roots[self.version] if version is None else self.roots[version]
@@ -19,10 +24,10 @@ class RBTree:
     root = property(get_root)
 
     def increase_version(self):
-        self.roots += [self.roots[self.version].copy()]
+        self.roots += [self.roots[self.version]]
         self.version += 1
         if self.roots[self.version] != self.null:
-            self.roots[self.version].version += 1
+            self.roots[self.version] = self.roots[self.version].copy(self.version)
 
     def _rotate_left(self, x: RBNode, x_parent: RBNode):
         """
@@ -125,36 +130,37 @@ class RBTree:
                     way, i = self._insert_fixup_case3(way, i, 'left')
         self.root.color = Color.black
 
-    def _do_step_by_key(self, node: RBNode, parent: RBNode, key, is_left: bool,
-                        way: List[RBNode]) -> Tuple[RBNode, RBNode, bool]:
+    def _do_step_by_edge(self, node: RBNode, parent: RBNode, edge: Edge, is_left: bool,
+                         way: List[RBNode]) -> Tuple[RBNode, RBNode, bool]:
         node = node.copy(self.version)
-        if is_left:
-            parent.left = node
-        else:
-            parent.right = node
+        if parent != self.null:
+            if is_left:
+                parent.left = node
+            else:
+                parent.right = node
 
         parent = node
         way.append(node)
-        is_left = key < node.key
+        is_left = self.edge_compare(edge, node.edge)
         if is_left:
             node = node.left
         else:
             node = node.right
         return node, parent, is_left
 
-    def insert(self, edge: Edge, key):
-        node = RBNode(self.version, Color.red, edge, key, self.null, self.null)
+    def insert(self, edge: Edge):
+        node = RBNode(self.version, Color.red, edge, self.null, self.null)
         y = self.null
         x = self.root
         way = [y]
         is_left = True
 
         while x != self.null:
-            x, y, is_left = self._do_step_by_key(x, y, key, is_left, way)
+            x, y, is_left = self._do_step_by_edge(x, y, edge, is_left, way)
 
         if y == self.null:
             self.roots[self.version] = node
-        elif key < y.key:
+        elif is_left:
             y.left = node
         else:
             y.right = node
@@ -272,14 +278,14 @@ class RBTree:
                     way, i = self._delete_fixup_case4(way, i, sibling, 'left')
         way[i].color = Color.black
 
-    def delete(self, edge: Edge, key):
+    def delete(self, edge: Edge):
         y = self.null
         z = self.root
         way = [y]
         is_left = True
 
         while z != self.null and z.edge != edge:
-            z, y, is_left = self._do_step_by_key(z, y, key, is_left, way)
+            z, y, is_left = self._do_step_by_edge(z, y, edge, is_left, way)
 
         color = z.color
         if z == self.null:

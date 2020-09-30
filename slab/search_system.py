@@ -2,6 +2,7 @@ from typing import List
 
 from dcel import Edge, DCEL, Point
 from slab.rbtree import RBTree
+from slab.utils import get_area
 
 
 class SearchSystem:
@@ -11,7 +12,7 @@ class SearchSystem:
 
     def __init__(self, dcel: DCEL):
         self.dcel = dcel
-        self.tree = RBTree()
+        self.tree = RBTree(self.edge_compare)
         self.lines = []
         self._init_slabs()
 
@@ -24,7 +25,7 @@ class SearchSystem:
         while self.dcel.vertexes[sorted_vertex_indexes[i]].y == y:
             for edge in self.dcel.get_incident_edges_for_vertex(sorted_vertex_indexes[i]):
                 if self.dcel.vertexes[edge.v2].y > y:
-                    self.tree.insert(edge, (self.dcel.vertexes[edge.v2].x, self.dcel.vertexes[edge.v1].x))
+                    self.tree.insert(edge)
             i += 1
         self.lines.append(y)
 
@@ -32,16 +33,24 @@ class SearchSystem:
             self.tree.increase_version()
             y = self.dcel.vertexes[sorted_vertex_indexes[i]].y
             while i < vertexes_count and self.dcel.vertexes[sorted_vertex_indexes[i]].y == y:
+                edges_to_add = []
                 for edge in self.dcel.get_incident_edges_for_vertex(sorted_vertex_indexes[i]):
-                    key = (self.dcel.vertexes[edge.v2].x, self.dcel.vertexes[edge.v1].x)
                     if self.dcel.vertexes[edge.v2].y > y:
-                        self.tree.insert(edge, key)
+                        edges_to_add.append(edge)
                     elif self.dcel.vertexes[edge.v1].y < y:
-                        self.tree.delete(edge, key)
+                        self.tree.delete(edge)
+                for edge in edges_to_add:
+                    self.tree.insert(edge)
                 i += 1
             self.lines.append(y)
         if i == vertexes_count - 1:
             self.lines.append(self.dcel.vertexes[sorted_vertex_indexes[i]].y)
+
+    def edge_compare(self, edge1: Edge, edge2: Edge) -> bool:
+        if edge1.v1 == edge2.v1:
+            return get_area(edge2, self.dcel.vertexes[edge1.v2], self.dcel.vertexes) > 0
+        else:
+            return get_area(edge2, self.dcel.vertexes[edge1.v1], self.dcel.vertexes) > 0
 
     def _search_band(self, y: int) -> int:
         if y < self.lines[0] or y > self.lines[-1]:
@@ -58,16 +67,10 @@ class SearchSystem:
             return r if r < lines_count - 1 else lines_count - 2
         return r - 1 if r > 0 else 0
 
-    def _get_area(self, edge: Edge, point: Point) -> int:
-        vertex1 = self.dcel.vertexes[edge.v1]
-        vertex2 = self.dcel.vertexes[edge.v2]
-        return vertex1.x * vertex2.y + vertex1.y * point.x + vertex2.x * point.y \
-            - vertex2.y * point.x - vertex1.y * vertex2.x - vertex1.x * point.y
-
     def _search_face(self, point: Point, band_index: int) -> int:
         node = self.tree.get_root(band_index)
         while True:
-            area = self._get_area(node.edge, point)
+            area = get_area(node.edge, point, self.dcel.vertexes)
             if area == 0:
                 return node.edge.f2 if node.edge.f2 != -1 else node.edge.f1
             elif area > 0:
